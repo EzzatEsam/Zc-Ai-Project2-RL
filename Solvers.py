@@ -1,3 +1,5 @@
+from map_data import *
+
 from shutil import get_terminal_size
 terminal_width, _ = get_terminal_size()
 
@@ -29,7 +31,8 @@ def _robot_visualizer(env, state):
     robot = env.state[:2]
     for j in range(env.bounds[1] - 1, -1, -1):
         for i in range(env.bounds[0]):
-            print('🤖' if (np.array([i, j]) & robot).all()  else '⬜', end='')
+            
+            print('🤖' if (i , j) ==  robot else '⬜', end='')
         print()
 
 class Environment:
@@ -99,66 +102,117 @@ import numpy as np
 
 class DeliveryRobot(Environment):
     
-    def __init__(self, x: int, y: int, current_holding: int, list_remaining_crates: list, bounds, max_reward, discount):
-        self.state = (x, y, current_holding, list_remaining_crates)
-        
-        self.pickup_locations = [[1, 2], [8, 6]]
-        self.dropoff_locations = [[2, 9], [5, 5]]
+    def __init__(self, start_pos : tuple , crates_pickup_locations : tuple , crates_dropoff_locations : tuple
+     , max_reward, discount):
+        """ The constructor for the delivery bot env
 
-        self.bounds = bounds
+        Building integer encoding :
+            OSS --> 1
+            AB  --> 2
+            NB  --> 3
+            HB  --> 4
+            NONE --> 0
+
+        Args:
+            start_pos (tuple): (x ,y) the start location of the robt
+            crates_pickup_locations (tuple): a tuple containing crates pick up locations  ex ( 3,3,3,3 , 4,4,4,4 )
+            crates_dropoff_locations (tuple): a tuple containing crates drop off locations  ex (1,2,2,1,1,1,2,1 )
+            max_reward (float): _description_
+            discount (float): _description_
+        """     
+        x , y , pickup_locations , dropoff_locations = start_pos[0] , start_pos[1] , crates_pickup_locations , crates_pickup_locations;
+        currently_holding = (0 ,)
+        self.state = (x , y) +currently_holding + pickup_locations 
+        print( f'Current state : {self.state}')
+        
+        self.dropoff_locations = dropoff_locations
+
+        self.bounds = (14,14)
         self.max_reward = max_reward
         self.discount = discount
     
-    def actions(self):
-        if self.state is None: return []
-        if not bool(self.state[-1]) and self.state[2] == 0: return ['Finish']
+    def decode_state(self, state) :
+        x = state[0]
+        y = state[1]
+        currently_holding = state[2]
+        pickup_locations = state[3 :]
+        return (x , y) , currently_holding , pickup_locations
 
-        if list(self.state[:2]) in self.pickup_locations and self.state[2] == 0: return ['Pickup'] 
-        if list(self.state[:2]) in self.dropoff_locations and self.state[2] != 0: return ['Dropoff'] 
+
+    def actions(self):
+
+        if self.state is None: return []
+
+        pos ,currently_holding ,  pickup_locations = self.decode_state(self.state)
+        current_building = position_to_building.get(pos , -1)
+        # print(f'Currently holding {currently_holding}')
+        # print(f'Current state {self.state}')
+
+        if not   currently_holding and not all (pickup_locations) : return ['Finish']
+
+        if not currently_holding and current_building != -1  and current_building in pickup_locations  : 
+            return ['Pickup'] 
+            
+        if currently_holding and  self.dropoff_locations[currently_holding -1] == current_building  : 
+            return ['Dropoff'] 
 
         return ['up', 'down', 'left', 'right']
     
     def apply(self, action):
+        print(f'Action is {action}')
+        print(f'Current state is {self.state}')
+
         up = lambda position: (position[0], min(position[1] + 1, self.bounds[1] - 1))
         down = lambda position: (position[0], max(position[1] - 1, 0))
         left = lambda position: (max(position[0] - 1, 0), position[1])
         right = lambda position: (min(position[0] + 1, self.bounds[0] - 1), position[1])
 
+        pos ,currently_holding ,  pickup_locations = self.decode_state(self.state)
+        current_building = position_to_building.get(pos , -1)
+
         if action == 'up': 
-            up(self.state[:2])
-            if self.state[2] == 0: return -0.2 * self.max_reward
+            self.state = ( up(pos)+ (currently_holding , )+ pickup_locations ) 
+            return -0.2 * self.max_reward
         if action == 'down': 
-            down(self.state[:2])
-            if self.state[2] == 0: return -0.2 * self.max_reward
+            self.state = ( down(pos) + (currently_holding , )+  pickup_locations ) 
+            return -0.2 * self.max_reward
         if action == 'left': 
-            left(self.state[:2])
-            if self.state[2] == 0: return -0.2 * self.max_reward
+            self.state =  (left(pos) + (currently_holding , )+  pickup_locations ) 
+            return -0.2 * self.max_reward
         if action == 'right': 
-            right(self.state[:2])
-            if self.state[2] == 0: return -0.2 * self.max_reward
+            self.state =  ( right(pos) + (currently_holding , )+  pickup_locations )
+            return -0.2 * self.max_reward
         
         elif action == 'Pickup': 
-            temp = list(self.state)
-            temp[2] = temp[-1].pop()
-            self.state = tuple(temp)
+            crate_idx = pickup_locations.index(current_building) 
+
+            pickup_locations[crate_idx ] = 0 ; # Mark crate as taken 
+
+            currently_holding = crate_idx +1
+            self.state = pos + (currently_holding ,)  +  pickup_locations
+
             return 0.4 * self.max_reward
         
-        elif action == 'Dropoff': 
-            self.state[2] = 0
-            self.state[:2] = (0, 0)
-            return 0  
-        
+        elif action == 'Dropoff':             
+            currently_holding = 0 
+
+            self.state = pos + (currently_holding ,) +  pickup_locations
+
+            return 0.4 * self.max_reward
+            
         elif action == 'Finish': self.state = None; return +self.max_reward
 
-    @classmethod
-    def new_random_instance(cls, bounds, max_reward, discount):
-        x, y = randrange(bounds[0]), randrange(bounds[1])
-        return cls(x, y, 0, tuple([i for i in range(1, 9)]), bounds = bounds, max_reward = max_reward, discount = discount)
-
+    
+def generate_env() :
+    pick_ups = ( 3,3,3,3 , 4,4,4,4 )
+    drop_offs = (1,2,2,1,1,1,2,1 )
+    start_pos = (0 , 0)
+    return DeliveryRobot(crates_dropoff_locations= drop_offs ,crates_pickup_locations= pick_ups ,
+    start_pos= start_pos ,discount= 0.1 ,max_reward= 100   ) 
 
 _visualizers[DeliveryRobot] = _robot_visualizer
 
 q, n = {}, {}
 # simulate(lambda: DeliveryRobot.new_random_instance((14, 14), 100, 0.1), duration=60, q=q, n=n)
-simulate(lambda: DeliveryRobot.new_random_instance((14, 14), 100, 0.1), n_iterations=5, q=q, n=n, verbose=False)
+simulate(generate_env , n_iterations=2, q=q, n=n, verbose=False)
 print(q)
