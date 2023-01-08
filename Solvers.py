@@ -1,6 +1,10 @@
+from tabnanny import verbose
 from map_data import *
 
 from shutil import get_terminal_size
+from random import choice, randrange
+
+
 terminal_width, _ = get_terminal_size()
 
 _visualizers = {}
@@ -29,10 +33,15 @@ class Visualizer:
 def _robot_visualizer(env, state):
     '''Custom visualizer for Tom and Jerry.'''
     robot = env.state[:2]
+    crates = [ building_to_position[bl] for bl in state[3 :] if bl > 0]
     for j in range(env.bounds[1] - 1, -1, -1):
         for i in range(env.bounds[0]):
-            
-            print('🤖' if (i , j) ==  robot else '⬜', end='')
+            if (i , j) ==  robot :
+                print('🤖' , end='')
+            elif (i ,j) in crates :
+                print('📦' , end = '')
+            else :
+                print('⬜',end = '') 
         print()
 
 class Environment:
@@ -63,7 +72,7 @@ def action_from_q(env, q, verbose=True):
     '''Get the best action for the current state of the environment from Q-values'''
     return max((action for action in env.actions()), key=lambda action: q.get((env.state, action), 0))
 
-def q_learning(env, q={}, n={}, f=lambda q, n: (q+1)/(n+1), alpha=lambda n: 60/(n+59), error=1e-6, verbose=False):
+def q_learning(env, q ={}, n ={}, f=lambda q, n: (q+1)/(n+1), alpha=lambda n: 60/(n+59), error=1e-6, verbose=False):
     '''Q-learning implementation that trains on an environment till no more actions can be taken'''
     if verbose: visualizer = Visualizer(env)
     while env.state is not None:
@@ -78,7 +87,7 @@ def q_learning(env, q={}, n={}, f=lambda q, n: (q+1)/(n+1), alpha=lambda n: 60/(
                            * (reward
                               + env.discount * max((q.get((env.state, next_action), 0) for next_action in env.actions()), default=0)
                               - q.get((state, action), 0))
-    print(state)
+    
     return q, n
 
 from math import inf
@@ -91,14 +100,16 @@ def simulate(env_ctor, n_iterations=inf, duration=inf, **q_learning_params):
     start_time = time()
     i = count()
     s = time()
+    idx = 0
     while time() < start_time + duration and next(i) < n_iterations:
         env = env_ctor()
         q, n = q_learning(env, **q_learning_params)
+        print(f'Iteration {idx}'); idx+=1;
     print("duration: ", time() - s)
     return q_learning_params['q'], q_learning_params['n']
 
-from random import choice, randrange
-import numpy as np
+
+
 
 class DeliveryRobot(Environment):
     
@@ -130,6 +141,7 @@ class DeliveryRobot(Environment):
         self.bounds = (14,14)
         self.max_reward = max_reward
         self.discount = discount
+        self.start_pos = start_pos
     
     def decode_state(self, state) :
         x = state[0]
@@ -148,7 +160,7 @@ class DeliveryRobot(Environment):
         # print(f'Currently holding {currently_holding}')
         # print(f'Current state {self.state}')
 
-        if not   currently_holding and not all (pickup_locations) : return ['Finish']
+        if not   currently_holding and  all (not pick_up for pick_up in pickup_locations) : return ['Finish']
 
         if not currently_holding and current_building != -1  and current_building in pickup_locations  : 
             return ['Pickup'] 
@@ -159,8 +171,8 @@ class DeliveryRobot(Environment):
         return ['up', 'down', 'left', 'right']
     
     def apply(self, action):
-        print(f'Action is {action}')
-        print(f'Current state is {self.state}')
+        # print(f'Action is {action}')
+        # print(f'Current state is {self.state}')
 
         up = lambda position: (position[0], min(position[1] + 1, self.bounds[1] - 1))
         down = lambda position: (position[0], max(position[1] - 1, 0))
@@ -185,8 +197,9 @@ class DeliveryRobot(Environment):
         
         elif action == 'Pickup': 
             crate_idx = pickup_locations.index(current_building) 
-
-            pickup_locations[crate_idx ] = 0 ; # Mark crate as taken 
+            temp = list(pickup_locations)
+            temp[crate_idx ] = 0 ; # Mark crate as taken 
+            pickup_locations = tuple(temp)
 
             currently_holding = crate_idx +1
             self.state = pos + (currently_holding ,)  +  pickup_locations
@@ -196,7 +209,7 @@ class DeliveryRobot(Environment):
         elif action == 'Dropoff':             
             currently_holding = 0 
 
-            self.state = pos + (currently_holding ,) +  pickup_locations
+            self.state = self.start_pos + (currently_holding ,) +  pickup_locations
 
             return 0.4 * self.max_reward
             
@@ -214,5 +227,6 @@ _visualizers[DeliveryRobot] = _robot_visualizer
 
 q, n = {}, {}
 # simulate(lambda: DeliveryRobot.new_random_instance((14, 14), 100, 0.1), duration=60, q=q, n=n)
-simulate(generate_env , n_iterations=2, q=q, n=n, verbose=False)
-print(q)
+simulate(generate_env , n_iterations=200, q=q, n=n, verbose=False ,f=lambda q, n: 1/(n+1))
+simulate(generate_env , n_iterations=1, q=q, n=n, verbose=False ,f=lambda q, n: q )
+#print(q)
