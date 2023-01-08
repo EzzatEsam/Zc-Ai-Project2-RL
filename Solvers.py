@@ -118,8 +118,7 @@ def simulate(env_ctor, n_iterations=inf, duration=inf, **q_learning_params):
 
 class DeliveryRobot(Environment):
     
-    def __init__(self, start_pos : tuple , crates_pickup_locations : tuple , crates_dropoff_locations : tuple
-     , max_reward, discount):
+    def __init__(self, start_pos: tuple, crates_pickup_locations: tuple, crates_dropoff_locations: tuple, max_reward, discount):
         """ The constructor for the delivery bot env
 
         Building integer encoding :
@@ -136,14 +135,14 @@ class DeliveryRobot(Environment):
             max_reward (float): _description_
             discount (float): _description_
         """     
-        x , y , pickup_locations , dropoff_locations = start_pos[0] , start_pos[1] , crates_pickup_locations , crates_dropoff_locations;
-        currently_holding = (0 ,)
-        self.state = (x , y) + currently_holding +  pickup_locations 
+        x, y, pickup_locations, dropoff_locations = start_pos[0], start_pos[1], crates_pickup_locations, crates_dropoff_locations;
+        currently_holding = (0,)
+        self.state = (x, y) + currently_holding +  pickup_locations 
         #print( f'Current state : {self.state}')
         
         self.dropoff_locations = dropoff_locations
 
-        self.bounds = (14,14)
+        self.bounds = (14, 14)
         self.max_reward = max_reward
         self.discount = discount
         self.start_pos = start_pos
@@ -152,25 +151,25 @@ class DeliveryRobot(Environment):
         x = state[0]
         y = state[1]
         currently_holding = state[2]
-        pickup_locations = state[3 :]
-        return (x , y) , currently_holding , pickup_locations
+        pickup_locations = state[3:]
+        return (x, y), currently_holding, pickup_locations
 
 
     def actions(self):
 
         if self.state is None: return []
 
-        pos ,currently_holding ,  pickup_locations = self.decode_state(self.state)
-        current_building = position_to_building.get(pos , -1)
+        pos, currently_holding,  pickup_locations = self.decode_state(self.state)
+        current_building = position_to_building.get(pos, -1)
         # print(f'Currently holding {currently_holding}')
         # print(f'Current state {self.state}')
 
-        if not   currently_holding and  all (not pick_up for pick_up in pickup_locations) : return ['Finish']
+        if not currently_holding and  all(not pick_up for pick_up in pickup_locations) : return ['Finish']
 
-        if not currently_holding and current_building != -1  and current_building in pickup_locations  : 
+        if not currently_holding and current_building != -1  and current_building in pickup_locations: 
             return ['Pickup'] 
             
-        if currently_holding and  self.dropoff_locations[currently_holding -1] == current_building  : 
+        if currently_holding and  self.dropoff_locations[currently_holding -1] == current_building: 
             return ['Dropoff'] 
 
         return ['up', 'down', 'left', 'right']
@@ -184,21 +183,21 @@ class DeliveryRobot(Environment):
         left = lambda position: (max(position[0] - 1, 0), position[1])
         right = lambda position: (min(position[0] + 1, self.bounds[0] - 1), position[1])
 
-        pos ,currently_holding ,  pickup_locations = self.decode_state(self.state)
-        current_building = position_to_building.get(pos , -1)
+        pos ,currently_holding,  pickup_locations = self.decode_state(self.state)
+        current_building = position_to_building.get(pos, -1)
 
         if action == 'up': 
-            self.state = ( up(pos)+ (currently_holding , )+ pickup_locations ) 
-            return -0.2 * self.max_reward
+            self.state = (up(pos)+ (currently_holding,) + pickup_locations) 
+            return -0.6 * self.max_reward
         if action == 'down': 
-            self.state = ( down(pos) + (currently_holding , )+  pickup_locations ) 
-            return -0.2 * self.max_reward
+            self.state = (down(pos) + (currently_holding,) +  pickup_locations) 
+            return -0.6 * self.max_reward
         if action == 'left': 
-            self.state =  (left(pos) + (currently_holding , )+  pickup_locations ) 
-            return -0.2 * self.max_reward
+            self.state = (left(pos) + (currently_holding,) +  pickup_locations) 
+            return -0.6 * self.max_reward
         if action == 'right': 
-            self.state =  ( right(pos) + (currently_holding , )+  pickup_locations )
-            return -0.2 * self.max_reward
+            self.state = (right(pos) + (currently_holding,)+  pickup_locations)
+            return -0.6 * self.max_reward
         
         elif action == 'Pickup': 
             crate_idx = pickup_locations.index(current_building) 
@@ -214,34 +213,34 @@ class DeliveryRobot(Environment):
         elif action == 'Dropoff':             
             currently_holding = 0 
 
-            self.state = self.start_pos + (currently_holding ,) +  pickup_locations
+            self.state = self.start_pos + (currently_holding,) +  pickup_locations
 
-            return 0.4 * self.max_reward
+            return 0.7 * self.max_reward
             
         elif action == 'Finish': self.state = None; return +self.max_reward
 
     
 def generate_env() :
-    pick_ups = ( 3,3,3,3 , 4,4,4,4 )
-    drop_offs = (1,2,2,1,1,1,2,1 )
-    start_pos = (7 , 1)
-    return DeliveryRobot(crates_dropoff_locations= drop_offs ,crates_pickup_locations= pick_ups ,
-    start_pos= start_pos ,discount= 0.1 ,max_reward= 100   ) 
+    pick_ups = (3, 4, 3, 4, 3, 4, 3, 4)
+    drop_offs = (1, 2, 2, 1, 1, 1, 2, 1)
+    start_pos = (7, 1)
+    return DeliveryRobot(crates_dropoff_locations = drop_offs, crates_pickup_locations = pick_ups,
+    start_pos = start_pos, discount = 0.1, max_reward = 100) 
 
 _visualizers[DeliveryRobot] = _robot_visualizer
 
 
 
-class ai_master :
+class ai_master:
 
     def give_me_my_states(self, states , env) : 
         self.states = states;
         self.env = env
 
-    def start(self , iterations = 250  ) :
+    def start(self, iterations = 3000) :
         q, n = {}, {}
         # simulate(lambda: DeliveryRobot.new_random_instance((14, 14), 100, 0.1), duration=60, q=q, n=n)
-        simulate(generate_env , n_iterations=iterations, q=q, n=n, verbose=False ,f=lambda q, n: 1/(n+1))
-        simulate(generate_env , n_iterations=1, q=q, n=n, verbose=False ,f=lambda q, n: q , states_target = self  )
+        simulate(generate_env, n_iterations = iterations, q = q, n = n, verbose = False, f = lambda q, n: 1/(n+1))
+        simulate(generate_env, n_iterations = 1, q = q, n = n, verbose = False, f = lambda q, n: q, states_target = self)
         #print(q)
         
