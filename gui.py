@@ -2,6 +2,8 @@ from doctest import master
 import tkinter as tk;
 from PIL import Image, ImageTk
 import customtkinter as ct;
+from map_data import *
+from Solvers import *
 
 
 MAP_NAME = 'map.png'
@@ -12,6 +14,31 @@ PHOTO_DIM = 504
 BOX_DIM = int(PHOTO_DIM/14) 
 
 class gui_handler :
+    
+    def draw_next_state(self , t= 0.3e3 ) :
+        state = self.states[self.idx]
+        env = self.env
+        self.idx +=1
+        pos ,currently_holding ,  pickup_locations = env.decode_state(state)
+        self.robot_loc = pos 
+        self.crate_locs = [ building_to_position[bl] for bl in pickup_locations if bl > 0]
+
+        if currently_holding :
+            self.target_loc  = building_to_position[ env.dropoff_locations[currently_holding -1] ]  
+
+        self.draw_objects()
+        self.root.after(int(t) , func=self.draw_next_state)
+
+
+
+    def get_states(self) :
+        self.ai.start()
+        self.idx = 0
+        self.states = self.ai.states
+        self.env = self.ai.env
+        self.draw_next_state()
+        
+        
 
     def reset(self) :
         if self.loc : 
@@ -47,7 +74,7 @@ class gui_handler :
         ct.set_default_color_theme("blue")  # Themes: blue (default), dark-blue, green
         root = ct.CTk();
         root.geometry("800x600")
-        button = ct.CTkButton(master=root,  text="CTkButton")
+        button = ct.CTkButton(master=root,  text="Start" , command= self.get_states)
         button.place(x = 600 , y = 20)
 
         combobox = ct.CTkOptionMenu(master=root,
@@ -71,10 +98,10 @@ class gui_handler :
 
         self.root = root ; 
         self.window = window
-        self.draw_objects()
         root.mainloop()
 
-    def __init__(self) -> None:
+    def __init__(self , ai_master_cls) -> None:
+        self.ai = ai_master_cls
         self.target_loc = (1 ,2);
         self.crate_locs = [ (4 ,5) ,(6,7)];
         self.robot_loc =  (12 ,5)
@@ -82,4 +109,4 @@ class gui_handler :
         self.crates = None ;
         self.loc = None ;
         self.start_ui()
-        
+

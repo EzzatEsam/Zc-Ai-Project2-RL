@@ -72,12 +72,14 @@ def action_from_q(env, q, verbose=True):
     '''Get the best action for the current state of the environment from Q-values'''
     return max((action for action in env.actions()), key=lambda action: q.get((env.state, action), 0))
 
-def q_learning(env, q ={}, n ={}, f=lambda q, n: (q+1)/(n+1), alpha=lambda n: 60/(n+59), error=1e-6, verbose=False):
+def q_learning(env, q ={}, n ={}, f=lambda q, n: (q+1)/(n+1), alpha=lambda n: 60/(n+59), error=1e-6, verbose=False , states_target = None):
     '''Q-learning implementation that trains on an environment till no more actions can be taken'''
     if verbose: visualizer = Visualizer(env)
+    if states_target : states = []
     while env.state is not None:
         if verbose: visualizer.visualize([env.state])
         state = env.state
+        if states_target : states.append(state)
         action = max(env.actions(),
                      key=lambda next_action: f(q.get((state, next_action), 0), n.get((state, next_action), 0)))
         n[(state, action)] = n.get((state, action), 0) + 1
@@ -88,6 +90,9 @@ def q_learning(env, q ={}, n ={}, f=lambda q, n: (q+1)/(n+1), alpha=lambda n: 60
                               + env.discount * max((q.get((env.state, next_action), 0) for next_action in env.actions()), default=0)
                               - q.get((state, action), 0))
     
+    if states_target :
+        states_target.give_me_my_states(states , env)
+
     return q, n
 
 from math import inf
@@ -131,10 +136,10 @@ class DeliveryRobot(Environment):
             max_reward (float): _description_
             discount (float): _description_
         """     
-        x , y , pickup_locations , dropoff_locations = start_pos[0] , start_pos[1] , crates_pickup_locations , crates_pickup_locations;
+        x , y , pickup_locations , dropoff_locations = start_pos[0] , start_pos[1] , crates_pickup_locations , crates_dropoff_locations;
         currently_holding = (0 ,)
-        self.state = (x , y) +currently_holding + pickup_locations 
-        print( f'Current state : {self.state}')
+        self.state = (x , y) + currently_holding +  pickup_locations 
+        #print( f'Current state : {self.state}')
         
         self.dropoff_locations = dropoff_locations
 
@@ -219,14 +224,24 @@ class DeliveryRobot(Environment):
 def generate_env() :
     pick_ups = ( 3,3,3,3 , 4,4,4,4 )
     drop_offs = (1,2,2,1,1,1,2,1 )
-    start_pos = (0 , 0)
+    start_pos = (7 , 1)
     return DeliveryRobot(crates_dropoff_locations= drop_offs ,crates_pickup_locations= pick_ups ,
     start_pos= start_pos ,discount= 0.1 ,max_reward= 100   ) 
 
 _visualizers[DeliveryRobot] = _robot_visualizer
 
-q, n = {}, {}
-# simulate(lambda: DeliveryRobot.new_random_instance((14, 14), 100, 0.1), duration=60, q=q, n=n)
-simulate(generate_env , n_iterations=200, q=q, n=n, verbose=False ,f=lambda q, n: 1/(n+1))
-simulate(generate_env , n_iterations=1, q=q, n=n, verbose=False ,f=lambda q, n: q )
-#print(q)
+
+
+class ai_master :
+
+    def give_me_my_states(self, states , env) : 
+        self.states = states;
+        self.env = env
+
+    def start(self , iterations = 250  ) :
+        q, n = {}, {}
+        # simulate(lambda: DeliveryRobot.new_random_instance((14, 14), 100, 0.1), duration=60, q=q, n=n)
+        simulate(generate_env , n_iterations=iterations, q=q, n=n, verbose=False ,f=lambda q, n: 1/(n+1))
+        simulate(generate_env , n_iterations=1, q=q, n=n, verbose=False ,f=lambda q, n: q , states_target = self  )
+        #print(q)
+        
