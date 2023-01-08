@@ -2,7 +2,7 @@ from tabnanny import verbose
 from map_data import *
 
 from shutil import get_terminal_size
-from random import choice, randrange
+from random import choice, random, randrange
 
 
 terminal_width, _ = get_terminal_size()
@@ -109,7 +109,7 @@ def simulate(env_ctor, n_iterations=inf, duration=inf, **q_learning_params):
     while time() < start_time + duration and next(i) < n_iterations:
         env = env_ctor()
         q, n = q_learning(env, **q_learning_params)
-        print(f'Iteration {idx}'); idx+=1;
+        print(f'Iteration {idx +1}'); idx+=1;
     print("duration: ", time() - s)
     return q_learning_params['q'], q_learning_params['n']
 
@@ -233,14 +233,23 @@ _visualizers[DeliveryRobot] = _robot_visualizer
 
 class ai_master:
 
+    q = {}
+    n = {}
     def give_me_my_states(self, states , env) : 
         self.states = states;
         self.env = env
 
-    def start(self, iterations = 3000) :
-        q, n = {}, {}
-        # simulate(lambda: DeliveryRobot.new_random_instance((14, 14), 100, 0.1), duration=60, q=q, n=n)
-        simulate(generate_env, n_iterations = iterations, q = q, n = n, verbose = False, f = lambda q, n: 1/(n+1))
-        simulate(generate_env, n_iterations = 1, q = q, n = n, verbose = False, f = lambda q, n: q, states_target = self)
+    def train(self ,   alg = 'exploring', iterations = 200 ) :
+        self.q = {}
+        self.n = {}
+        if alg == 'exploring' : f=lambda q, n: 1/(n+1) 
+        if alg == 'random' : f=lambda q, n: random()
+        if alg == 'greedy' :  f=lambda q, n: q 
+        simulate(generate_env, n_iterations = iterations, q = self.q, n = self.n, verbose = False, f = lambda q, n: 1/(n+1))
+
+
+    def start(self) :
+
+        simulate(generate_env, n_iterations = 1, q = self.q, n = self.n, verbose = False, f = lambda q, n: q, states_target = self)
         #print(q)
         
