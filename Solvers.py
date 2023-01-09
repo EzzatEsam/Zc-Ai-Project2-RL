@@ -213,7 +213,8 @@ class DeliveryRobot(Environment):
         elif action == 'Dropoff':             
             currently_holding = 0 
 
-            self.state = self.start_pos + (currently_holding,) +  pickup_locations
+            #self.state = self.start_pos + (currently_holding,) +  pickup_locations
+            self.state = pos + (currently_holding,) +  pickup_locations
 
             return 0.7 * self.max_reward
             
