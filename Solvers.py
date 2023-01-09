@@ -274,7 +274,7 @@ class ai_master:
     def give_me_my_table(self,table) :
         self.iterations += 1
         for key , val in table.items() :
-            self.table[key] = self.table.get(key , '') + f' ,I{self.iterations} :  {val :.2f} '
+            self.table[key] = self.table.get(key , '') + f' ,i({self.iterations}) :  {val :.2f} '
 
     def train(self ,   alg = 'exploring', learning_rate = 'Normal'  , discount = 0.3,iterations = 200 ,  save_table = False   ) :
         self.q = {}
