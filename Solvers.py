@@ -201,16 +201,16 @@ class DeliveryRobot(Environment):
 
         if action == 'up': 
             self.state = (up(pos)+ (currently_holding,) + pickup_locations) 
-            return -0.6 * self.max_reward
+            return -(0.4 if currently_holding else 0.6 ) * self.max_reward
         if action == 'down': 
             self.state = (down(pos) + (currently_holding,) +  pickup_locations) 
-            return -0.6 * self.max_reward
+            return -(0.4 if currently_holding else 0.6 ) * self.max_reward
         if action == 'left': 
             self.state = (left(pos) + (currently_holding,) +  pickup_locations) 
-            return -0.6 * self.max_reward
+            return -(0.4 if currently_holding else 0.6 ) * self.max_reward
         if action == 'right': 
             self.state = (right(pos) + (currently_holding,)+  pickup_locations)
-            return -0.6 * self.max_reward
+            return -(0.4 if currently_holding else 0.6 ) * self.max_reward
         
         elif action == 'Pickup': 
             crate_idx = pickup_locations.index(current_building) 
