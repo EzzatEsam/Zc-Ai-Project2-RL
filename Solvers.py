@@ -1,8 +1,12 @@
-from tabnanny import verbose
 from map_data import *
+import ujson
+
 
 from shutil import get_terminal_size
 from random import choice, random, randrange
+
+
+DISCOUNT = 0.3 
 
 
 terminal_width, _ = get_terminal_size()
@@ -72,10 +76,11 @@ def action_from_q(env, q, verbose=True):
     '''Get the best action for the current state of the environment from Q-values'''
     return max((action for action in env.actions()), key=lambda action: q.get((env.state, action), 0))
 
-def q_learning(env, q ={}, n ={}, f=lambda q, n: (q+1)/(n+1), alpha=lambda n: 60/(n+59), error=1e-6, verbose=False , states_target = None):
+def q_learning(env, q ={}, n ={}, f=lambda q, n: (q+1)/(n+1), alpha=lambda n: 60/(n+59), error=1e-6, verbose=False , states_target = None , table_target = None):
     '''Q-learning implementation that trains on an environment till no more actions can be taken'''
     if verbose: visualizer = Visualizer(env)
     if states_target : states = []
+
     while env.state is not None:
         if verbose: visualizer.visualize([env.state])
         state = env.state
@@ -88,7 +93,9 @@ def q_learning(env, q ={}, n ={}, f=lambda q, n: (q+1)/(n+1), alpha=lambda n: 60
                            + alpha(n[state, action]) \
                            * (reward
                               + env.discount * max((q.get((env.state, next_action), 0) for next_action in env.actions()), default=0)
-                              - q.get((state, action), 0))
+                              - q.get((state, action), 0)) 
+
+    if table_target : table_target.give_me_my_table(q)
     
     if states_target :
         states_target.give_me_my_states(states , env)
@@ -148,6 +155,12 @@ class DeliveryRobot(Environment):
         self.start_pos = start_pos
     
     def decode_state(self, state) :
+        """ Extracts the data from the state vector to a more user friendly format
+
+        Args:
+            state (tuple): The tuple of the state
+
+        """        
         x = state[0]
         y = state[1]
         currently_holding = state[2]
@@ -222,35 +235,79 @@ class DeliveryRobot(Environment):
 
     
 def generate_env() :
-    pick_ups = (3, 4, 3, 4, 3, 4, 3, 4)
-    drop_offs = (1, 2, 2, 1, 1, 1, 2, 1)
+    '''
+    Building integer encoding :
+            OSS --> 1
+            AB  --> 2
+            NB  --> 3
+            HB  --> 4
+            NONE --> 0
+    '''
+
+    pick_ups = (3, 4, 3, 4, 3, 4, 3, 4)   # list of crates to be picked up at each building
+    drop_offs = (1, 2, 2, 1, 1, 1, 2, 1)  # list of delivery location for each crate 
+
     start_pos = (7, 1)
     return DeliveryRobot(crates_dropoff_locations = drop_offs, crates_pickup_locations = pick_ups,
-    start_pos = start_pos, discount = 0.1, max_reward = 100) 
+    start_pos = start_pos, discount = DISCOUNT, max_reward = 100) 
 
 _visualizers[DeliveryRobot] = _robot_visualizer
 
 
 
 class ai_master:
-
+    """A class for encapsulating the RL process 
+    """    
+    iterations = 0
+    table = {}
     q = {}
     n = {}
     def give_me_my_states(self, states , env) : 
+        """ Stores a refrence to the environment and a list of states (final path) after training
+        Args:
+            states (_type_): States aquired from the q learning functions
+            env (_type_): refrence to the env
+        """        
         self.states = states;
         self.env = env
 
-    def train(self ,   alg = 'exploring', iterations = 200 ) :
+    def give_me_my_table(self,table) :
+        self.iterations += 1
+        for key , val in table.items() :
+            self.table[key] = self.table.get(key , '') + f' ,I{self.iterations} :  {val :.2f} '
+
+    def train(self ,   alg = 'exploring', learning_rate = 'Normal'  , discount = 0.3,iterations = 200 ,  save_table = False   ) :
         self.q = {}
         self.n = {}
+        self.table = {}
+        self.iterations = 0
         if alg == 'exploring' : f=lambda q, n: 1/(n+1) 
         if alg == 'random' : f=lambda q, n: random()
         if alg == 'greedy' :  f=lambda q, n: q 
-        simulate(generate_env, n_iterations = iterations, q = self.q, n = self.n, verbose = False, f = lambda q, n: 1/(n+1))
 
+
+        print(f'save table : {save_table}')
+        if learning_rate == 'Normal' : alpha=lambda n: 60/(n+59)
+        else : alpha=lambda n: float(learning_rate)
+
+        DISCOUNT = discount
+        simulate(generate_env, n_iterations = iterations, q = self.q, n = self.n, verbose = False, alpha = alpha , 
+         f = lambda q, n: 1/(n+1) , table_target = self if save_table else None)
+       
+        if save_table: self.save_to_json()
+
+    
 
     def start(self) :
-
+        """ Simulate after training (updates the states list)
+        """        
         simulate(generate_env, n_iterations = 1, q = self.q, n = self.n, verbose = False, f = lambda q, n: q, states_target = self)
         #print(q)
+
+    def save_to_json(self) :
+        
+        with open("qvals.json", "w") as outfile:
+            ujson.dump(self.table, outfile , indent = 4)
+        
+
         

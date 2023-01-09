@@ -1,3 +1,4 @@
+from cgitb import text
 from doctest import master
 import tkinter as tk;
 from PIL import Image, ImageTk
@@ -32,6 +33,9 @@ class gui_handler :
         self.robot_loc = pos 
         self.crate_locs = [ building_to_position[bl] for bl in pickup_locations if bl > 0]
 
+        self.nb_boxes.configure(text =  f'NB boxes : {sum(loc == 3 for loc in pickup_locations )}')
+        self.hb_boxes.configure(text =  f'HB boxes : {sum(loc == 4 for loc in pickup_locations)}')
+
         if currently_holding :
             self.target_loc  = building_to_position[ env.dropoff_locations[currently_holding -1] ] 
         else :
@@ -42,7 +46,9 @@ class gui_handler :
 
 
     def begin_train(self) :
-        self.ai.train(  alg = self.alg.get(), iterations = int(self.iterations.get()) )
+        self.ai.train(  alg = self.alg.get(), iterations = int(self.iterations.get())  ,save_table = self.save2table.get() ,
+        learning_rate = self.alpha.get() , discount = float(self.discount.get()) 
+        )
 
     def stop_sim(self) :
         self.stopped = True;
@@ -54,6 +60,7 @@ class gui_handler :
         self.idx = 0
         self.states = self.ai.states
         self.env = self.ai.env
+        self.path_len.configure(text =f'Path length : {len(self.states)}' )
         self.draw_next_state()
         
         
@@ -69,6 +76,8 @@ class gui_handler :
             for crate in self.crates :
                 self.window.delete(crate);
             self.crates = [] 
+        # self.nb_boxes.configure(text =  'NB boxes :')
+        # self.hb_boxes.configure(text =  'HB boxes :')
 
     def draw_objects(self ) :
         self.reset();
@@ -92,6 +101,8 @@ class gui_handler :
         ct.set_default_color_theme("blue")  # Themes: blue (default), dark-blue, green
         root = ct.CTk();
         root.geometry("800x510")
+        root.resizable(False, False)
+        root.title('ZC pathfinder')
         
 
 
@@ -126,8 +137,33 @@ class gui_handler :
         label3 = ct.CTkLabel(master= root ,text= 'simulation time')
         label3.place(x = 700 , y = 250-30)
 
+
+        self.discount = ct.StringVar(root)
+        combobox4 = ct.CTkOptionMenu(master=root, variable= self.discount ,
+                                       values=['0.1','0.2' ,"0.3", "0.4" ], width= 40
+                                       )
+        combobox4.place(x = 700 , y = 30)
+        combobox4.set("0.3")  # set initial value
+
+        label4 = ct.CTkLabel(master= root ,text= 'Discount')
+        label4.place(x = 700 , y = 5)
+#############
+        self.alpha = ct.StringVar(root)
+        combobox5 = ct.CTkOptionMenu(master=root, variable= self.alpha ,
+                                       values=["Normal" , '0.1' ,'0.3'  , '0.5' , '0.7' ], width= 40
+                                       )
+        combobox5.place(x = 700 , y = 90)
+        combobox5.set("Normal")  # set initial value
+
+        label5 = ct.CTkLabel(master= root ,text= 'Learning rate')
+        label5.place(x = 700 , y = 90-30)
+
         button1 = ct.CTkButton(master=root,  text="Train" , command= self.begin_train)
         button1.place(x = 550 , y = 150)
+
+        self.save2table = ct.BooleanVar(master= root);
+        chkbox1 = ct.CTkCheckBox(master = root ,text= 'Save table' ,variable= self.save2table)
+        chkbox1.place(x = 700 , y = 150)
 
         button = ct.CTkButton(master=root,fg_color = 'green' , text="Start" , command= self.get_states )
         button.place(x = 550 , y = 250)
@@ -146,6 +182,18 @@ class gui_handler :
         self.robot_img = ImageTk.PhotoImage(Image.open(ROBOT_PATH).resize((BOX_DIM,BOX_DIM), Image.ANTIALIAS)  )
         self.crate_img = ImageTk.PhotoImage(Image.open(CRATE_PATH).resize((BOX_DIM,BOX_DIM), Image.ANTIALIAS)  )
         self.target_img = ImageTk.PhotoImage(Image.open(TARGEt_PATH).resize((BOX_DIM,BOX_DIM), Image.ANTIALIAS)  )
+
+        #
+        self.nb_boxes = ct.CTkLabel(master= root , text= 'NB boxes :') ;
+        self.nb_boxes.place(x = 550 , y = 350) ;
+
+        self.hb_boxes = ct.CTkLabel(master= root , text= 'HB boxes :') ;
+        self.hb_boxes.place(x = 550 , y = 380) ;
+
+        self.path_len = ct.CTkLabel(master= root , text= 'Path length :') ;
+        self.path_len.place(x = 550 , y = 400) ;
+
+
         
 
         self.root = root ; 

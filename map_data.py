@@ -6,3 +6,4 @@ position_to_building = {
 }
 
 building_to_position = {v: k for k, v in position_to_building.items()}
+
