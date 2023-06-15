@@ -292,7 +292,7 @@ class ai_master:
 
         DISCOUNT = discount
         simulate(generate_env, n_iterations = iterations, q = self.q, n = self.n, verbose = False, alpha = alpha , 
-         f = lambda q, n: 1/(n+1) , table_target = self if save_table else None)
+        f = f , table_target = self if save_table else None)
        
         if save_table: self.save_to_json()
 

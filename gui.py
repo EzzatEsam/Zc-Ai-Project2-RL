@@ -1,6 +1,3 @@
-from cgitb import text
-from doctest import master
-import tkinter as tk;
 from PIL import Image, ImageTk
 import customtkinter as ct;
 from map_data import *
